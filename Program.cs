@@ -1,58 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
-
-//3. Сериализация списка
-List<int> scores = new List<int> { 80, 90, 70 };
-string numbersJson = JsonSerializer.Serialize(scores);
-Console.WriteLine(numbersJson);
-
-JsonSerializerOptions options = new JsonSerializerOptions
-{
-    WriteIndented = true
-};
-string formattedJson = JsonSerializer.Serialize(scores, options);
-Console.WriteLine(formattedJson);
-
-//4. Десериализация и выбор типа
-string inputJson = "[1,2]";
-List<int> restoredScores = JsonSerializer.Deserialize<List<int>>(inputJson)
- ?? throw new JsonException("Ожидается массив чисел, а не null");
-Console.WriteLine(restoredScores.Count);
-Console.WriteLine(restoredScores[1]);
-
-//5. Сериализация словаря
-Dictionary<string, int> resultsExample = new Dictionary<string, int>
-{
- { "анна", 80 },
- { "борис", 90 }
-};
-// string dictionaryJson = JsonSerializer.Serialize(
-//  resultsExample, new JsonSerializerOptions { WriteIndented = true });
-// Console.WriteLine(dictionaryJson);
-// Dictionary<string, int> restoredResults =
-//  JsonSerializer.Deserialize<Dictionary<string, int>>(dictionaryJson)
-//  ?? throw new JsonException("Ожидается объект результатов");
-// Console.WriteLine(restoredResults["анна"]);
-
-//Найдите ошибку: ToString() вместо JSON
-string dictionaryJson = JsonSerializer.Serialize(
-    resultsExample, new JsonSerializerOptions { WriteIndented = true });
-Console.WriteLine(dictionaryJson);
-Dictionary<string, int> restoredResults =
-    JsonSerializer.Deserialize<Dictionary<string, int>>(dictionaryJson)
-    ?? throw new JsonException("Ожидается объект результатов");
-
-Console.WriteLine(restoredResults["анна"]);
-
-// восстановление прошло без исключения — значит, это корректный JSON
-if (restoredResults.Count != 2 ||
-    restoredResults["анна"] != 80 ||
-    restoredResults["борис"] != 90)
-{
-    throw new InvalidDataException("Словарь восстановлен неверно");
-}
 
 //6. Сохранение и загрузка JSON-файла
 void SaveResults(string path, Dictionary<string, int> results)
@@ -84,22 +34,119 @@ Dictionary<string, int> LoadResults(string path)
     return results;
 }
 
-string examplePath = Path.Combine("data", "example-results.json");
-SaveResults(examplePath, resultsExample);
-Dictionary<string, int> loadedExample = LoadResults(examplePath);
 
-//7. Отсутствующий и повреждённый файл
-//Найдите ошибку: повреждённый журнал перезаписан
-string path = Path.Combine("data", "damaged-example.json");
-
-Dictionary<string, int> loaded;
-try
+//8. Основная часть — «Журнал результатов в JSON»
+int ReadScore()
 {
-    loaded = LoadResults(path);
+    while (true)
+    {
+        string input = Console.ReadLine() ?? "";
+        if (int.TryParse(input, out int value) && value >= 0 && value <= 100)
+        {
+            return value;
+        }
+        Console.WriteLine("Введите целое число от 0 до 100");
+    }
+} 
+
+void PrintResults(Dictionary<string, int> results)
+{
+    if (results.Count == 0)
+    {
+        Console.WriteLine("Журнал пуст");
+        return;
+    }
+    foreach (KeyValuePair<string, int> entry in results)
+    {
+        Console.WriteLine($"{entry.Key}: {entry.Value}");
+    }
+} 
+
+string dataDirectory = "data";
+string path = Path.Combine(dataDirectory, "results.json");
+
+try
+{   Directory.CreateDirectory(dataDirectory);
+    Dictionary<string, int> results;
+
+    try
+    {
+        results = LoadResults(path);
+    }
+    catch (FileNotFoundException)
+    {
+        results = new Dictionary<string, int>();
+        Console.WriteLine("Файл журнала отсутствует. Создан новый журнал в памяти");
+    }
+
+    Console.WriteLine($"Загружено участников: {results.Count}");
+    PrintResults(results);
+
+    Console.Write("Имя для добавления или обновления: ");
+    string name = (Console.ReadLine() ?? "").Trim().ToLowerInvariant();
+
+    int score = ReadScore();
+
+    if (results.ContainsKey(name))
+    {
+        results[name] = score;
+        Console.WriteLine("Результат обновлён");
+    }
+    else
+    {
+        results[name] = score;
+        Console.WriteLine("Участник добавлен");
+    }
+
+    Console.Write("Имя для удаления: ");
+    string nameToRemove = (Console.ReadLine() ?? "").Trim().ToLowerInvariant();
+
+    if (results.Remove(nameToRemove))
+    {
+        Console.WriteLine("Участник удалён");
+    }
+    else
+    {
+        Console.WriteLine("Участник не найден");
+    }
+
+    Console.Write("Имя для поиска: ");
+    string nameToFind = (Console.ReadLine() ?? "").Trim().ToLowerInvariant();
+
+    if (results.TryGetValue(nameToFind, out int foundScore))
+    {
+        Console.WriteLine($"Результат: {foundScore}");
+    }
+    else
+    {
+        Console.WriteLine("Участник не найден");
+    }
+
+    SaveResults(path, results);
+    Dictionary<string, int> restored = LoadResults(path);
+
+    Console.WriteLine(">>> Журнал после чтения из файла <<");
+    Console.WriteLine($"Количество участников: {restored.Count}");
+    PrintResults(restored);
+    Console.WriteLine($"Журнал сохранён: {Path.GetFullPath(path)}");
 }
 catch (JsonException)
 {
-    Console.WriteLine("Ошибка JSON: журнал не изменён");
-    return;  
+    Console.WriteLine("Ошибка JSON: проверьте содержимое журнала");
 }
-SaveResults(path, loaded);
+catch (InvalidDataException)
+{
+    Console.WriteLine("Недопустимые данные журнала: проверьте имена и диапазон 0-100");
+}
+catch (FileNotFoundException)
+{
+    Console.WriteLine("Файл не найден при повторном чтении журнала");
+}
+catch (UnauthorizedAccessException)
+{
+    Console.WriteLine("Нет доступа к файлу или папке");
+}
+catch (IOException)
+{
+    Console.WriteLine("Ошибка чтения или записи файла");
+}
