@@ -66,7 +66,8 @@ string dataDirectory = "data";
 string path = Path.Combine(dataDirectory, "results.json");
 
 try
-{   Directory.CreateDirectory(dataDirectory);
+{
+    Directory.CreateDirectory(dataDirectory);
     Dictionary<string, int> results;
 
     try
@@ -129,6 +130,19 @@ try
     Console.WriteLine($"Количество участников: {restored.Count}");
     PrintResults(restored);
     Console.WriteLine($"Журнал сохранён: {Path.GetFullPath(path)}");
+
+//Вариант 1. Отбор по результату
+    Console.Write("Порог результата (0-100): ");
+    int limit = int.Parse(Console.ReadLine() ?? "0");
+
+    Dictionary<string, int> selected = SelectResults(restored, limit);
+
+    string selectedPath = Path.Combine(dataDirectory, "selected-results.json");
+    SaveResults(selectedPath, selected);
+
+    Console.WriteLine($">>> Отобрано участников: {selected.Count}");
+    PrintResults(selected);
+    Console.WriteLine($"Отбор сохранён: {Path.GetFullPath(selectedPath)}");
 }
 catch (JsonException)
 {
@@ -149,4 +163,19 @@ catch (UnauthorizedAccessException)
 catch (IOException)
 {
     Console.WriteLine("Ошибка чтения или записи файла");
+} 
+
+//13. Самостоятельное задание
+//Вариант 1. Отбор по результату
+Dictionary<string, int> SelectResults(Dictionary<string, int> results, int limit)
+{
+    Dictionary<string, int> selected = new Dictionary<string, int>();
+    foreach (KeyValuePair<string, int> entry in results)
+    {
+        if (entry.Value >= limit)
+        {
+            selected[entry.Key] = entry.Value;
+        }
+    }
+    return selected;
 }
